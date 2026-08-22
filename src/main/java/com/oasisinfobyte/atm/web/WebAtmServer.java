@@ -412,6 +412,9 @@ public class WebAtmServer {
         .error-lbl { color: #FF4646; font-size: 12px; text-align: center; margin-top: 8px; font-weight: 600; }
         .success-lbl { color: #00DC6E; font-size: 12px; text-align: center; margin-top: 8px; font-weight: 700; }
         
+        .panel { display: none; }
+        .panel.active { display: block; }
+
         .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); align-items: center; justify-content: center; z-index: 1000; }
         .modal-overlay.active { display: flex; }
     </style>
