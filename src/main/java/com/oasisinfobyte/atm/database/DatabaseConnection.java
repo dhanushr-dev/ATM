@@ -97,15 +97,32 @@ public final class DatabaseConnection {
                 .getClassLoader()
                 .getResourceAsStream(PROPS_FILE)) {
 
-            if (is == null) {
-                throw new DatabaseException("Cannot find " + PROPS_FILE + " on the classpath");
+            if (is != null) {
+                props.load(is);
             }
-            props.load(is);
 
-            url      = props.getProperty("db.url");
-            username = props.getProperty("db.username");
-            password = props.getProperty("db.password");
-            driver   = props.getProperty("db.driver");
+            // Environment variable support for Railway / Cloud deployment
+            String envHost = System.getenv("MYSQLHOST");
+            String envPort = System.getenv("MYSQLPORT");
+            String envDb   = System.getenv("MYSQLDATABASE");
+            String envUser = System.getenv("MYSQLUSER");
+            String envPass = System.getenv("MYSQLPASSWORD");
+            String envUrl  = System.getenv("DB_URL");
+
+            if (envHost != null && !envHost.isBlank()) {
+                url = "jdbc:mysql://" + envHost + ":" + (envPort != null ? envPort : "3306") + "/" + envDb + "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+                username = envUser;
+                password = envPass;
+            } else if (envUrl != null && !envUrl.isBlank()) {
+                url = envUrl;
+                username = System.getenv("DB_USERNAME");
+                password = System.getenv("DB_PASSWORD");
+            } else {
+                url      = props.getProperty("db.url");
+                username = props.getProperty("db.username");
+                password = props.getProperty("db.password");
+            }
+            driver = props.getProperty("db.driver", "com.mysql.cj.jdbc.Driver");
 
             LOGGER.info("Database properties loaded successfully.");
 
