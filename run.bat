@@ -1,0 +1,3 @@
+@echo off
+echo Starting ATM Interface...
+java -jar "target\ATM-Interface.jar"

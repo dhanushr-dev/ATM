@@ -1,0 +1,5 @@
+# Copy this file to database.properties and fill in your credentials
+db.url=jdbc:mysql://localhost:3306/atm_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+db.username=root
+db.password=YOUR_PASSWORD_HERE
+db.driver=com.mysql.cj.jdbc.Driver
