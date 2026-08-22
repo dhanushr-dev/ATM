@@ -18,7 +18,8 @@ public class InitRailwayDatabase {
         String pass = System.getenv("MYSQLPASSWORD");
         String db   = System.getenv("MYSQLDATABASE");
 
-        if (host == null || host.isBlank()) host = "mysql-production-2b57.up.railway.app";
+        if (host == null || host.isBlank()) host = System.getenv("DB_HOST");
+        if (host == null || host.isBlank()) host = "mysql.railway.internal";
         if (port == null || port.isBlank()) port = "3306";
         if (user == null || user.isBlank()) user = "root";
         if (pass == null || pass.isBlank()) pass = "tbYrETJfetbesRhyaaQfgJjgCMMFsVhV";

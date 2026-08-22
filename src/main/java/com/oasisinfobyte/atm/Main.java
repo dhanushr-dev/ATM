@@ -40,22 +40,18 @@ public class Main {
         ATMTheme.applyGlobalDefaults();
 
         // ── 4. Check database & Auto-initialize if running in headless cloud (e.g. Railway) ──
+        // ── 4. Check database & Auto-initialize if running in headless cloud (e.g. Railway) ──
         if (java.awt.GraphicsEnvironment.isHeadless()) {
             LOGGER.info("Headless environment detected (Railway / Cloud deployment).");
-            try {
-                com.oasisinfobyte.atm.tools.InitRailwayDatabase.main(args);
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Cloud database auto-init notice: " + e.getMessage());
-            }
 
-            // Start lightweight HTTP server for Railway health check on port 8080
+            // Start lightweight HTTP server IMMEDIATELY for Railway health check on port 8080
             try {
                 int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
                 com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress(port), 0);
                 server.createContext("/", exchange -> {
                     String response = "<html><body style='font-family:sans-serif;background:#081024;color:#00C6FF;padding:40px;'>"
                             + "<h1>🏦 ATM Interface Cloud Service is Running!</h1>"
-                            + "<p style='color:#e6f2ff;'>Database Status: <b>Connected & Initialized</b></p>"
+                            + "<p style='color:#e6f2ff;'>Status: <b style='color:#00DC6E;'>Online & Active</b></p>"
                             + "<p style='color:#82a5d2;'>GitHub Repo: <a style='color:#00C6FF;' href='https://github.com/dhanushr-dev/ATM'>dhanushr-dev/ATM</a></p>"
                             + "</body></html>";
                     byte[] bytes = response.getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -65,7 +61,17 @@ public class Main {
                     os.close();
                 });
                 server.start();
-                LOGGER.info("Cloud Health Check HTTP Server started on port " + port);
+                LOGGER.info("Cloud Health Check HTTP Server started successfully on port " + port);
+
+                // Run DB initialization asynchronously in background thread
+                new Thread(() -> {
+                    try {
+                        com.oasisinfobyte.atm.tools.InitRailwayDatabase.main(args);
+                    } catch (Exception e) {
+                        LOGGER.log(Level.WARNING, "Cloud database auto-init notice: " + e.getMessage());
+                    }
+                }).start();
+
                 return;
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Failed to start HTTP server", e);
