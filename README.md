@@ -288,8 +288,12 @@ mvn test
 
 ## 👨‍💻 Author
 
-**Oasis Infobyte Java Development Intern**  
-Project: ATM Interface | Task 3
+**Dhanush R**  
+Oasis Infobyte Java Development Intern  
+Project: ATM Interface | Task 3  
+
+- 🔗 **LinkedIn:** [Dhanush R](https://www.linkedin.com/in/dhanushr)  
+- 🐙 **GitHub:** [dhanushr-dev](https://github.com/dhanushr-dev)
 
 ---
 
