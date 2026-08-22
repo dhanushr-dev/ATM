@@ -24,8 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
- * Premium Web Server for the ATM Interface.
- * Renders a high-end web app matching the Desktop Swing UI.
+ * Pixel-Perfect Web Server matching the Desktop Swing Interface.
  */
 public class WebAtmServer {
 
@@ -60,7 +59,7 @@ public class WebAtmServer {
 
         server.setExecutor(null);
         server.start();
-        LOGGER.info("Premium Web ATM Application Server running on port " + port);
+        LOGGER.info("Pixel-Perfect Web ATM Application Server running on port " + port);
     }
 
     private class StaticHandler implements HttpHandler {
@@ -97,9 +96,10 @@ public class WebAtmServer {
                 sessions.put(token, acc);
 
                 User user = controller.getCurrentUser();
+                String maskedAcc = "••••••••••••" + acc.getAccountNumber().substring(Math.max(0, acc.getAccountNumber().length() - 4));
                 String json = String.format(Locale.US,
-                        "{\"success\":true,\"token\":\"%s\",\"accountNumber\":\"%s\",\"fullName\":\"%s\",\"email\":\"%s\",\"phone\":\"%s\",\"balance\":%.2f,\"accountType\":\"%s\"}",
-                        token, acc.getAccountNumber(), user.getFullName(), user.getEmail(), user.getPhone(), acc.getBalance(), acc.getAccountType());
+                        "{\"success\":true,\"token\":\"%s\",\"accountNumber\":\"%s\",\"maskedAccount\":\"%s\",\"fullName\":\"%s\",\"email\":\"%s\",\"phone\":\"%s\",\"balance\":%.2f,\"accountType\":\"%s\"}",
+                        token, acc.getAccountNumber(), maskedAcc, user.getFullName(), user.getEmail(), user.getPhone(), acc.getBalance(), acc.getAccountType());
                 sendJson(exchange, 200, json);
             } catch (Exception e) {
                 sendJson(exchange, 400, "{\"success\":false,\"error\":\"" + escapeJson(e.getMessage()) + "\"}");
@@ -144,9 +144,10 @@ public class WebAtmServer {
             try {
                 BigDecimal balance = controller.getBalance();
                 User user = controller.getCurrentUser();
+                String maskedAcc = "••••••••••••" + acc.getAccountNumber().substring(Math.max(0, acc.getAccountNumber().length() - 4));
                 String json = String.format(Locale.US,
-                        "{\"success\":true,\"accountNumber\":\"%s\",\"fullName\":\"%s\",\"email\":\"%s\",\"phone\":\"%s\",\"balance\":%.2f,\"accountType\":\"%s\",\"status\":\"%s\"}",
-                        acc.getAccountNumber(), user != null ? user.getFullName() : "Valued Customer",
+                        "{\"success\":true,\"accountNumber\":\"%s\",\"maskedAccount\":\"%s\",\"fullName\":\"%s\",\"email\":\"%s\",\"phone\":\"%s\",\"balance\":%.2f,\"accountType\":\"%s\",\"status\":\"%s\"}",
+                        acc.getAccountNumber(), maskedAcc, user != null ? user.getFullName() : "Valued Customer",
                         user != null ? user.getEmail() : "", user != null ? user.getPhone() : "",
                         balance, acc.getAccountType(), acc.getStatus());
                 sendJson(exchange, 200, json);
@@ -234,8 +235,9 @@ public class WebAtmServer {
                     Transaction t = list.get(i);
                     if (i > 0) sb.append(",");
                     sb.append(String.format(Locale.US,
-                            "{\"ref\":\"%s\",\"type\":\"%s\",\"amount\":%.2f,\"balanceAfter\":%.2f,\"date\":\"%s\"}",
-                            t.getReferenceNumber(), t.getTransactionType().getDisplayName(), t.getAmount(), t.getBalanceAfter(), t.getFormattedDate()));
+                            "{\"ref\":\"%s\",\"type\":\"%s\",\"amount\":%.2f,\"signedAmount\":\"%s\",\"balanceAfter\":%.2f,\"date\":\"%s\"}",
+                            t.getReferenceNumber(), t.getTransactionType().getDisplayName(), t.getAmount(),
+                            t.getSignedAmountString(), t.getBalanceAfter(), t.getFormattedDate()));
                 }
                 sb.append("]}");
                 sendJson(exchange, 200, sb.toString());
@@ -327,240 +329,459 @@ public class WebAtmServer {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecureATM — Enterprise Web Banking</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>SecureATM — Desktop Experience</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-        body { background: #081024; color: #E6F2FF; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #081024; color: #E6F2FF; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
         
-        .card { background: #0E1A34; border: 1px solid #19325F; border-radius: 16px; padding: 32px; width: 100%; max-width: 480px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
-        .title { font-size: 26px; font-weight: 700; color: #00C6FF; text-align: center; margin-bottom: 24px; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .label { font-size: 11px; font-weight: 700; color: #82A5D2; text-transform: uppercase; margin-bottom: 6px; margin-top: 14px; letter-spacing: 0.5px; }
+        /* App Window Frame (Matching 980x660 Swing Desktop Window) */
+        .app-window { width: 100vw; height: 100vh; max-width: 1200px; max-height: 720px; background: #081024; display: flex; box-shadow: 0 20px 60px rgba(0,0,0,0.8); overflow: hidden; }
         
-        .input-group { position: relative; width: 100%; }
-        input, select { width: 100%; padding: 12px 14px; background: #122241; border: 1px solid #19325F; border-radius: 8px; color: #FFF; font-size: 14px; outline: none; transition: 0.2s; }
-        input:focus, select:focus { border-color: #00C6FF; box-shadow: 0 0 10px rgba(0,198,255,0.3); }
-        .toggle-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #00C6FF; cursor: pointer; font-size: 16px; padding: 4px; }
+        /* LOGIN MODAL FRAME */
+        .login-frame { background: #0E1A34; border: 1px solid #19325F; border-radius: 16px; padding: 36px; width: 100%; max-width: 440px; margin: auto; box-shadow: 0 15px 50px rgba(0,0,0,0.7); }
+        .login-header { font-size: 26px; font-weight: 700; color: #00C6FF; text-align: center; margin-bottom: 24px; }
+        .field-label { font-size: 11px; font-weight: 700; color: #82A5D2; text-transform: uppercase; margin-bottom: 6px; margin-top: 14px; letter-spacing: 0.5px; }
         
-        .btn { width: 100%; padding: 13px; margin-top: 20px; background: linear-gradient(135deg, #00C6FF, #008CC8); border: none; border-radius: 8px; color: #081024; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.2s; letter-spacing: 0.5px; }
-        .btn:hover { opacity: 0.95; transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0,198,255,0.4); }
-        .btn-sec { background: transparent; border: 1px solid #00C6FF; color: #00C6FF; margin-top: 12px; }
-        .btn-sec:hover { background: rgba(0,198,255,0.1); }
-        .btn-danger { background: #FF4646; color: #FFF; }
-        .btn-danger:hover { background: #E03535; }
+        .input-group { position: relative; width: 100%; display: flex; align-items: center; }
+        input, select { width: 100%; height: 38px; padding: 0 12px; background: #122241; border: 1px solid #19325F; border-radius: 6px; color: #FFF; font-size: 14px; outline: none; transition: 0.2s; }
+        input:focus, select:focus { border-color: #00C6FF; }
+        .eye-btn { position: absolute; right: 4px; height: 30px; width: 36px; background: #0E1A34; border: 1px solid #19325F; color: #00C6FF; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        
+        .btn-primary { width: 100%; height: 40px; margin-top: 20px; background: #00C6FF; border: none; border-radius: 6px; color: #081024; font-weight: 700; font-size: 13px; cursor: pointer; transition: 0.2s; }
+        .btn-primary:hover { background: #00A3D9; }
+        .btn-secondary { width: 100%; height: 40px; margin-top: 10px; background: #0E1A34; border: 1px solid #00C6FF; border-radius: 6px; color: #00C6FF; font-weight: 700; font-size: 13px; cursor: pointer; transition: 0.2s; }
+        .btn-secondary:hover { background: #00C6FF; color: #081024; }
+        .btn-danger { background: #FF4646; color: #FFF; border: none; }
+        .btn-danger:hover { background: #D93636; }
+        
+        /* SIDEBAR (LEFT) */
+        .sidebar { width: 220px; background: #0A142A; border-right: 1px solid #19325F; display: flex; flex-direction: column; padding: 20px 14px; }
+        .brand { font-size: 18px; font-weight: 700; color: #00C6FF; padding-bottom: 12px; border-bottom: 2px solid #00C6FF; margin-bottom: 20px; }
+        
+        .user-card { background: #0E1A34; border: 1px solid #19325F; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
+        .user-card-name { font-size: 14px; font-weight: 700; color: #FFF; }
+        .user-card-acc { font-size: 11px; color: #82A5D2; font-family: monospace; }
+        .user-card-bal-title { font-size: 10px; color: #82A5D2; margin-top: 8px; text-transform: uppercase; }
+        .user-card-bal { font-size: 16px; font-weight: 700; color: #00C6FF; }
+        
+        .nav-btn { width: 100%; height: 38px; background: transparent; border: none; border-radius: 6px; color: #82A5D2; font-size: 13px; font-weight: 600; text-align: left; padding: 0 12px; margin-bottom: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.15s; }
+        .nav-btn:hover, .nav-btn.active { background: #001E41; color: #00C6FF; }
+        .sidebar-footer { margin-top: auto; border-top: 1px solid #19325F; padding-top: 12px; }
+        .clock-lbl { font-size: 11px; color: #466496; margin-bottom: 8px; font-family: monospace; text-align: center; }
+        
+        /* MAIN WORKSPACE (RIGHT) */
+        .workspace { flex: 1; background: #081024; padding: 28px 32px; display: flex; flex-direction: column; overflow-y: auto; }
+        .top-hero { background: #0E1A34; border: 1px solid #19325F; border-radius: 12px; padding: 22px 28px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .hero-left h1 { font-size: 26px; font-weight: 700; color: #FFF; }
+        .hero-left p { font-size: 12px; color: #82A5D2; margin-top: 4px; }
+        .hero-left h3 { font-size: 30px; font-weight: 700; color: #00C6FF; margin-top: 6px; }
+        .hero-right { background: #0A142A; border: 1px solid #19325F; padding: 14px 20px; border-radius: 8px; text-align: right; }
+        .hero-right-label { font-size: 10px; color: #82A5D2; text-transform: uppercase; font-weight: 700; }
+        .hero-right-val { font-size: 13px; color: #FFF; font-weight: 600; }
+        .hero-right-status { font-size: 12px; color: #00DC6E; font-weight: 700; }
+        
+        /* 8-GRID QUICK ACTIONS */
+        .grid-title { font-size: 14px; font-weight: 700; color: #82A5D2; text-transform: uppercase; margin-bottom: 16px; letter-spacing: 0.5px; }
+        .actions-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .action-card { background: #0E1A34; border: 1px solid #19325F; border-radius: 10px; padding: 24px 16px; text-align: center; cursor: pointer; transition: 0.2s; position: relative; overflow: hidden; }
+        .action-card:hover { transform: translateY(-2px); border-color: #00C6FF; box-shadow: 0 8px 25px rgba(0,198,255,0.2); }
+        .action-card-icon { font-size: 26px; margin-bottom: 10px; }
+        .action-card-title { font-size: 13px; font-weight: 700; color: #FFF; }
+        .action-card-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; }
+        
+        /* FORM CARDS */
+        .form-card { background: #0E1A34; border: 1px solid #19325F; border-radius: 12px; padding: 28px; max-width: 600px; margin: 0 auto; width: 100%; }
+        .form-title { font-size: 22px; font-weight: 700; color: #00C6FF; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+        .form-sub { font-size: 12px; color: #82A5D2; margin-bottom: 18px; }
+        .banner-info { background: #003265; border: 1px solid #00C6FF; color: #00C6FF; font-size: 12px; font-weight: 600; padding: 8px 14px; border-radius: 6px; margin-bottom: 16px; }
+        .banner-warn { background: #403000; border: 1px solid #FFC300; color: #FFC300; font-size: 12px; font-weight: 600; padding: 8px 14px; border-radius: 6px; margin-bottom: 16px; }
         
         .quick-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-        .chip { flex: 1; min-width: 70px; padding: 8px; background: #122241; border: 1px solid #19325F; color: #00C6FF; font-weight: 600; font-size: 13px; border-radius: 6px; text-align: center; cursor: pointer; transition: 0.2s; }
-        .chip:hover { background: #001E41; border-color: #00C6FF; }
+        .chip { padding: 6px 14px; background: #0E1A34; border: 1px solid #00C6FF; color: #00C6FF; font-weight: 600; font-size: 12px; border-radius: 16px; cursor: pointer; transition: 0.15s; }
+        .chip:hover { background: #00C6FF; color: #081024; }
         
-        .error { color: #FF4646; font-size: 13px; margin-top: 10px; text-align: center; font-weight: 500; }
-        .success { color: #00DC6E; font-size: 13px; margin-top: 10px; text-align: center; font-weight: 600; }
+        .btn-row { display: flex; gap: 10px; margin-top: 24px; }
+        .btn-row button { flex: 1; }
         
-        /* Dashboard Container */
-        .dash-container { display: none; width: 100%; max-width: 980px; background: #0E1A34; border: 1px solid #19325F; border-radius: 16px; overflow: hidden; box-shadow: 0 15px 50px rgba(0,0,0,0.7); }
-        .dash-header { background: #0A142A; padding: 22px 32px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #19325F; }
-        .user-info h2 { color: #FFF; font-size: 20px; font-weight: 700; }
-        .user-info p { color: #82A5D2; font-size: 13px; margin-top: 2px; }
-        .bal-badge { background: #122241; border: 1px solid #00C6FF; padding: 12px 22px; border-radius: 12px; text-align: right; box-shadow: 0 0 15px rgba(0,198,255,0.15); }
-        .bal-badge span { font-size: 11px; color: #82A5D2; font-weight: 600; letter-spacing: 0.5px; display: block; }
-        .bal-badge strong { font-size: 22px; color: #00DC6E; font-weight: 700; }
+        /* TABLES */
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #0E1A34; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #19325F; font-size: 13px; }
+        th { color: #00C6FF; background: #0A142A; font-weight: 700; text-transform: uppercase; font-size: 11px; }
         
-        .dash-body { display: flex; min-height: 520px; }
-        .sidebar { width: 230px; background: #0A142A; border-right: 1px solid #19325F; padding: 18px 12px; display: flex; flex-direction: column; }
-        .nav-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 13px 16px; margin-bottom: 6px; background: transparent; border: none; color: #82A5D2; font-size: 14px; font-weight: 500; border-radius: 8px; cursor: pointer; transition: 0.2s; }
-        .nav-item:hover, .nav-item.active { background: #001E41; color: #00C6FF; font-weight: 600; }
-        .content { flex: 1; padding: 32px; background: #0E1A34; }
-        .panel { display: none; }
-        .panel.active { display: block; }
+        .error-lbl { color: #FF4646; font-size: 12px; text-align: center; margin-top: 8px; font-weight: 600; }
+        .success-lbl { color: #00DC6E; font-size: 12px; text-align: center; margin-top: 8px; font-weight: 700; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #19325F; font-size: 13px; }
-        th { color: #00C6FF; background: #0A142A; font-weight: 600; }
-        
-        .receipt-box { background: #122241; border: 1px dashed #00C6FF; padding: 24px; border-radius: 12px; font-family: 'Consolas', monospace; color: #E6F2FF; margin-top: 15px; }
-        
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; padding: 20px; z-index: 100; }
-        .modal.active { display: flex; }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
     </style>
 </head>
 <body>
 
-    <!-- LOGIN FORM -->
-    <div id="loginCard" class="card">
-        <div class="title">🏦 SecureATM Login</div>
-        <div class="label">16-Digit Account Number</div>
-        <input type="text" id="loginAcc" placeholder="e.g. 1001000000000001" maxlength="16">
+    <!-- 1. LOGIN FRAME -->
+    <div id="loginFrame" class="login-frame">
+        <div class="login-header">🔒 SecureATM</div>
+        <div class="field-label">Account Number</div>
+        <input type="text" id="loginAcc" placeholder="16-digit account number" maxlength="16" value="1001000000000001">
         
-        <div class="label">4-Digit PIN</div>
+        <div class="field-label">PIN</div>
         <div class="input-group">
-            <input type="password" id="loginPin" placeholder="••••" maxlength="4">
-            <button class="toggle-btn" onclick="togglePin('loginPin', this)">👁</button>
+            <input type="password" id="loginPin" placeholder="4-digit PIN" maxlength="4" value="1234">
+            <button class="eye-btn" onclick="toggleEye('loginPin', this)">👁</button>
         </div>
         
-        <div id="loginErr" class="error"></div>
-        <button class="btn" onclick="doLogin()">LOGIN TO ATM</button>
-        <button class="btn btn-sec" onclick="openModal('regModal')">➕ OPEN NEW ACCOUNT</button>
+        <div id="loginErr" class="error-lbl"></div>
+        <button class="btn-primary" onclick="doLogin()">LOGIN</button>
+        <button class="btn-secondary" onclick="openModal('regModal')">➕ OPEN NEW ACCOUNT</button>
     </div>
 
-    <!-- DASHBOARD -->
-    <div id="dashContainer" class="dash-container">
-        <div class="dash-header">
-            <div class="user-info">
-                <h2 id="userName">User</h2>
-                <p id="userAcc">Acc: --------</p>
+    <!-- 2. DASHBOARD FRAME -->
+    <div id="dashFrame" class="app-window" style="display:none;">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="brand">🔒 SecureATM</div>
+            
+            <div class="user-card">
+                <div id="sideName" class="user-card-name">User Name</div>
+                <div id="sideAcc" class="user-card-acc">••••••••••••0001</div>
+                <div class="user-card-bal-title">Available Balance</div>
+                <div id="sideBal" class="user-card-bal">₹0.00</div>
             </div>
-            <div class="bal-badge">
-                <span>AVAILABLE BALANCE</span>
-                <strong id="userBal">₹0.00</strong>
+            
+            <button class="nav-btn active" onclick="navTo('pnlHome', this)">🏠 Home</button>
+            <button class="nav-btn" onclick="navTo('pnlDeposit', this)">💰 Deposit Money</button>
+            <button class="nav-btn" onclick="navTo('pnlWithdraw', this)">💵 Withdraw Money</button>
+            <button class="nav-btn" onclick="navTo('pnlTransfer', this)">↔ Transfer Money</button>
+            <button class="nav-btn" onclick="navTo('pnlBalance', this); loadBalance();">💳 Balance Inquiry</button>
+            <button class="nav-btn" onclick="navTo('pnlHistory', this); loadHistory();">📜 Transaction History</button>
+            <button class="nav-btn" onclick="navTo('pnlReceipt', this); loadReceipt();">🧾 Mini Statement</button>
+            <button class="nav-btn" onclick="navTo('pnlPin', this)">🔑 Change PIN</button>
+            
+            <div class="sidebar-footer">
+                <div id="liveClock" class="clock-lbl">--:--:--</div>
+                <button class="btn-secondary" style="margin-top:0; height:34px;" onclick="doLogout()">🔒 Logout</button>
+                <button class="btn-secondary btn-danger" style="margin-top:6px; height:34px;" onclick="doLogout()">🚪 Exit ATM</button>
             </div>
         </div>
-        <div class="dash-body">
-            <div class="sidebar">
-                <button class="nav-item active" onclick="showTab('tabSummary', this)">🏠 Account Summary</button>
-                <button class="nav-item" onclick="showTab('tabDeposit', this)">💰 Deposit Cash</button>
-                <button class="nav-item" onclick="showTab('tabWithdraw', this)">💵 Withdraw Cash</button>
-                <button class="nav-item" onclick="showTab('tabTransfer', this)">💸 Fund Transfer</button>
-                <button class="nav-item" onclick="showTab('tabHistory', this); loadHistory();">📜 Transaction History</button>
-                <button class="nav-item" onclick="showTab('tabReceipt', this); loadReceipt();">🧾 Mini Statement</button>
-                <button class="nav-item" onclick="showTab('tabPin', this)">🔑 Change PIN</button>
-                <button class="nav-item btn-danger" style="margin-top:auto;" onclick="doLogout()">🚪 Logout</button>
+        
+        <!-- WORKSPACE AREA -->
+        <div class="workspace">
+            <!-- PANEL: HOME DASHBOARD -->
+            <div id="pnlHome" class="panel active">
+                <div class="top-hero">
+                    <div class="hero-left">
+                        <p>Welcome back,</p>
+                        <h1 id="heroName">Arjun Sharma 👤</h1>
+                        <p>Available Balance</p>
+                        <h3 id="heroBal">₹25,000.00</h3>
+                        <p id="heroDate" style="color:#466496; margin-top:6px; font-size:11px;">Saturday, 22 August 2026</p>
+                    </div>
+                    <div class="hero-right">
+                        <div class="hero-right-label">Account No.</div>
+                        <div id="heroAcc" class="hero-right-val">••••••••••••0001</div>
+                        <div class="hero-right-label" style="margin-top:8px;">Account Type</div>
+                        <div id="heroType" class="hero-right-val">SAVINGS</div>
+                        <div class="hero-right-label" style="margin-top:8px;">Status</div>
+                        <div class="hero-right-status">● ACTIVE</div>
+                    </div>
+                </div>
+                
+                <div class="grid-title">Quick Actions</div>
+                <div class="actions-grid">
+                    <div class="action-card" onclick="navTo('pnlDeposit', getNavBtn(1))">
+                        <div class="action-card-icon">💰</div>
+                        <div class="action-card-title">Deposit</div>
+                        <div class="action-card-bar" style="background:#00DC6E;"></div>
+                    </div>
+                    <div class="action-card" onclick="navTo('pnlWithdraw', getNavBtn(2))">
+                        <div class="action-card-icon">💵</div>
+                        <div class="action-card-title">Withdraw</div>
+                        <div class="action-card-bar" style="background:#FF4646;"></div>
+                    </div>
+                    <div class="action-card" onclick="navTo('pnlTransfer', getNavBtn(3))">
+                        <div class="action-card-icon">↔</div>
+                        <div class="action-card-title">Transfer</div>
+                        <div class="action-card-bar" style="background:#00C6FF;"></div>
+                    </div>
+                    <div class="action-card" onclick="navTo('pnlBalance', getNavBtn(4)); loadBalance();">
+                        <div class="action-card-icon">💳</div>
+                        <div class="action-card-title">Balance</div>
+                        <div class="action-card-bar" style="background:#A064FF;"></div>
+                    </div>
+                    <div class="action-card" onclick="navTo('pnlHistory', getNavBtn(5)); loadHistory();">
+                        <div class="action-card-icon">📜</div>
+                        <div class="action-card-title">History</div>
+                        <div class="action-card-bar" style="background:#FFC300;"></div>
+                    </div>
+                    <div class="action-card" onclick="navTo('pnlReceipt', getNavBtn(6)); loadReceipt();">
+                        <div class="action-card-icon">🧾</div>
+                        <div class="action-card-title">Mini Stmt</div>
+                        <div class="action-card-bar" style="background:#00B4D8;"></div>
+                    </div>
+                    <div class="action-card" onclick="navTo('pnlPin', getNavBtn(7))">
+                        <div class="action-card-icon">🔑</div>
+                        <div class="action-card-title">Change PIN</div>
+                        <div class="action-card-bar" style="background:#48CAE4;"></div>
+                    </div>
+                    <div class="action-card" onclick="doLogout()">
+                        <div class="action-card-icon">🚪</div>
+                        <div class="action-card-title">Logout</div>
+                        <div class="action-card-bar" style="background:#82A5D2;"></div>
+                    </div>
+                </div>
             </div>
-            <div class="content">
-                <!-- ACCOUNT SUMMARY -->
-                <div id="tabSummary" class="panel active">
-                    <h3 style="color:#00C6FF; margin-bottom:15px;">Welcome to SecureATM</h3>
-                    <div style="background:#122241; border:1px solid #19325F; padding:20px; border-radius:12px;">
-                        <p style="color:#82A5D2; font-size:13px; margin-bottom:8px;">Account Holder: <b style="color:#FFF;" id="sumName">-</b></p>
-                        <p style="color:#82A5D2; font-size:13px; margin-bottom:8px;">Account Number: <b style="color:#00C6FF;" id="sumAcc">-</b></p>
-                        <p style="color:#82A5D2; font-size:13px; margin-bottom:8px;">Account Type: <b style="color:#FFF;" id="sumType">-</b></p>
-                        <p style="color:#82A5D2; font-size:13px; margin-bottom:8px;">Account Status: <b style="color:#00DC6E;" id="sumStatus">ACTIVE</b></p>
-                        <p style="color:#82A5D2; font-size:13px;">Current Balance: <b style="color:#00DC6E; font-size:18px;" id="sumBal">₹0.00</b></p>
-                    </div>
-                </div>
-
-                <!-- DEPOSIT -->
-                <div id="tabDeposit" class="panel">
-                    <h3 style="color:#00C6FF;">Deposit Cash</h3>
-                    <div class="label">Amount (₹)</div>
+            
+            <!-- PANEL: DEPOSIT -->
+            <div id="pnlDeposit" class="panel">
+                <div class="form-card">
+                    <div class="form-title">💰 Deposit Money</div>
+                    <div class="form-sub">Add funds to your account</div>
+                    <div class="banner-info">ℹ Max single deposit: ₹1,00,000 · Min: ₹1</div>
+                    
+                    <div class="field-label">AMOUNT (₹)</div>
                     <input type="number" id="depAmt" placeholder="Enter deposit amount">
+                    
+                    <div style="font-size:11px; color:#82A5D2; margin-top:10px;">Quick:</div>
                     <div class="quick-row">
-                        <div class="chip" onclick="setAmt('depAmt', 500)">+ ₹500</div>
-                        <div class="chip" onclick="setAmt('depAmt', 1000)">+ ₹1,000</div>
-                        <div class="chip" onclick="setAmt('depAmt', 2000)">+ ₹2,000</div>
-                        <div class="chip" onclick="setAmt('depAmt', 5000)">+ ₹5,000</div>
+                        <div class="chip" onclick="setAmt('depAmt', 500)">₹500</div>
+                        <div class="chip" onclick="setAmt('depAmt', 1000)">₹1000</div>
+                        <div class="chip" onclick="setAmt('depAmt', 2000)">₹2000</div>
+                        <div class="chip" onclick="setAmt('depAmt', 5000)">₹5000</div>
+                        <div class="chip" onclick="setAmt('depAmt', 10000)">₹10000</div>
+                        <div class="chip" onclick="setAmt('depAmt', 20000)">₹20000</div>
                     </div>
+                    
                     <div id="depMsg"></div>
-                    <button class="btn" onclick="doDeposit()">CONFIRM DEPOSIT</button>
+                    <div class="btn-row">
+                        <button class="btn-primary" onclick="doDeposit()">DEPOSIT</button>
+                        <button class="btn-secondary" onclick="clearInput('depAmt', 'depMsg')">CLEAR</button>
+                        <button class="btn-secondary" onclick="navTo('pnlHome', getNavBtn(0))">← BACK</button>
+                    </div>
                 </div>
-
-                <!-- WITHDRAW -->
-                <div id="tabWithdraw" class="panel">
-                    <h3 style="color:#00C6FF;">Withdraw Cash</h3>
-                    <div class="label">Amount (₹)</div>
+            </div>
+            
+            <!-- PANEL: WITHDRAW -->
+            <div id="pnlWithdraw" class="panel">
+                <div class="form-card">
+                    <div class="form-title">💵 Withdraw Money</div>
+                    <div class="form-sub">Withdraw cash from your account</div>
+                    <div class="banner-info">ℹ Max per transaction: ₹50,000 · Min: ₹1</div>
+                    
+                    <div class="field-label">AMOUNT (₹)</div>
                     <input type="number" id="wdAmt" placeholder="Enter withdrawal amount">
+                    
+                    <div style="font-size:11px; color:#82A5D2; margin-top:10px;">Quick:</div>
                     <div class="quick-row">
                         <div class="chip" onclick="setAmt('wdAmt', 500)">₹500</div>
-                        <div class="chip" onclick="setAmt('wdAmt', 1000)">₹1,000</div>
-                        <div class="chip" onclick="setAmt('wdAmt', 2000)">₹2,000</div>
-                        <div class="chip" onclick="setAmt('wdAmt', 5000)">₹5,000</div>
+                        <div class="chip" onclick="setAmt('wdAmt', 1000)">₹1000</div>
+                        <div class="chip" onclick="setAmt('wdAmt', 2000)">₹2000</div>
+                        <div class="chip" onclick="setAmt('wdAmt', 5000)">₹5000</div>
+                        <div class="chip" onclick="setAmt('wdAmt', 10000)">₹10000</div>
+                        <div class="chip" onclick="setAmt('wdAmt', 20000)">₹20000</div>
+                        <div class="chip" onclick="setAmt('wdAmt', 50000)">₹50000</div>
                     </div>
+                    
                     <div id="wdMsg"></div>
-                    <button class="btn" onclick="doWithdraw()">CONFIRM WITHDRAWAL</button>
+                    <div class="btn-row">
+                        <button class="btn-primary" onclick="doWithdraw()">WITHDRAW</button>
+                        <button class="btn-secondary" onclick="clearInput('wdAmt', 'wdMsg')">CLEAR</button>
+                        <button class="btn-secondary" onclick="navTo('pnlHome', getNavBtn(0))">← BACK</button>
+                    </div>
                 </div>
-
-                <!-- TRANSFER -->
-                <div id="tabTransfer" class="panel">
-                    <h3 style="color:#00C6FF;">Fund Transfer</h3>
-                    <div class="label">Target Account Number (16 Digits)</div>
-                    <input type="text" id="trAcc" placeholder="e.g. 1001000000000002" maxlength="16">
-                    <div class="label">Transfer Amount (₹)</div>
+            </div>
+            
+            <!-- PANEL: TRANSFER -->
+            <div id="pnlTransfer" class="panel">
+                <div class="form-card">
+                    <div class="form-title">↔ Transfer Money</div>
+                    <div class="form-sub">Send funds to another account</div>
+                    <div class="banner-info">ℹ Transfers are immediate and irreversible · Max: ₹50,000</div>
+                    
+                    <div class="field-label">DESTINATION ACCOUNT NUMBER (16 DIGITS)</div>
+                    <input type="text" id="trAcc" placeholder="16-digit account number" maxlength="16">
+                    
+                    <div class="field-label">AMOUNT (₹)</div>
                     <input type="number" id="trAmt" placeholder="Enter amount">
+                    
                     <div id="trMsg"></div>
-                    <button class="btn" onclick="doTransfer()">CONFIRM TRANSFER</button>
-                </div>
-
-                <!-- HISTORY -->
-                <div id="tabHistory" class="panel">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3 style="color:#00C6FF;">Transaction History</h3>
-                        <button class="chip" style="width:auto; padding:6px 14px;" onclick="exportCSV()">📊 Export CSV</button>
+                    <div class="btn-row">
+                        <button class="btn-primary" onclick="doTransfer()">TRANSFER</button>
+                        <button class="btn-secondary" onclick="clearInput('trAcc', 'trMsg'); clearInput('trAmt', null);">CLEAR</button>
+                        <button class="btn-secondary" onclick="navTo('pnlHome', getNavBtn(0))">← BACK</button>
                     </div>
-                    <table>
-                        <thead>
-                            <tr><th>Date</th><th>Ref</th><th>Type</th><th>Amount</th><th>Balance</th></tr>
-                        </thead>
-                        <tbody id="txTable">
-                            <tr><td colspan="5">Loading history...</td></tr>
-                        </tbody>
-                    </table>
                 </div>
-
-                <!-- MINI STATEMENT -->
-                <div id="tabReceipt" class="panel">
-                    <h3 style="color:#00C6FF;">Mini Statement Receipt</h3>
-                    <div id="receiptBox" class="receipt-box">Loading statement...</div>
-                </div>
-
-                <!-- CHANGE PIN -->
-                <div id="tabPin" class="panel">
-                    <h3 style="color:#00C6FF;">Change 4-Digit PIN</h3>
-                    <div class="label">Current PIN</div>
-                    <div class="input-group">
-                        <input type="password" id="pinOld" maxlength="4">
-                        <button class="toggle-btn" onclick="togglePin('pinOld', this)">👁</button>
+            </div>
+            
+            <!-- PANEL: BALANCE INQUIRY -->
+            <div id="pnlBalance" class="panel">
+                <div class="form-card" style="max-width:700px;">
+                    <div class="form-title">💳 Balance Inquiry</div>
+                    <div class="form-sub">Real-time account balance</div>
+                    
+                    <div style="background:#0A142A; border:1px solid #19325F; padding:24px; border-radius:10px; margin-bottom:20px;">
+                        <div style="font-size:11px; color:#82A5D2; font-weight:700;">AVAILABLE BALANCE</div>
+                        <div id="balVal" style="font-size:36px; font-weight:700; color:#00C6FF; margin-top:4px;">₹25,000.00</div>
                     </div>
                     
-                    <div class="label">New PIN</div>
-                    <div class="input-group">
-                        <input type="password" id="pinNew" maxlength="4">
-                        <button class="toggle-btn" onclick="togglePin('pinNew', this)">👁</button>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+                        <div>
+                            <div class="field-label">ACCOUNT HOLDER</div>
+                            <div id="balHolder" style="font-size:14px; font-weight:700; color:#FFF;">Arjun Sharma</div>
+                        </div>
+                        <div>
+                            <div class="field-label">ACCOUNT NUMBER</div>
+                            <div id="balAcc" style="font-size:14px; font-weight:700; color:#82A5D2; font-family:monospace;">••••••••••••0001</div>
+                        </div>
+                        <div>
+                            <div class="field-label">ACCOUNT TYPE</div>
+                            <div id="balType" style="font-size:14px; font-weight:700; color:#FFF;">SAVINGS Account</div>
+                        </div>
+                        <div>
+                            <div class="field-label">STATUS</div>
+                            <div style="font-size:14px; font-weight:700; color:#00DC6E;">● ACTIVE</div>
+                        </div>
                     </div>
                     
-                    <div class="label">Confirm New PIN</div>
+                    <div class="btn-row">
+                        <button class="btn-primary" onclick="loadBalance()">🔄 REFRESH</button>
+                        <button class="btn-secondary" onclick="navTo('pnlHome', getNavBtn(0))">← BACK</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PANEL: HISTORY -->
+            <div id="pnlHistory" class="panel">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <div>
+                        <div class="form-title" style="margin-bottom:0;">📜 Transaction History</div>
+                        <div class="form-sub" style="margin-bottom:0;">All your account transactions</div>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn-secondary" style="width:auto; height:34px; padding:0 14px; margin-top:0;" onclick="exportCSV()">📊 Export CSV</button>
+                        <button class="btn-primary" style="width:auto; height:34px; padding:0 14px; margin-top:0;" onclick="loadHistory()">🔄 Refresh</button>
+                    </div>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Date & Time</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Balance After</th>
+                            <th>Reference</th>
+                        </tr>
+                    </thead>
+                    <tbody id="txTable">
+                        <tr><td colspan="6" style="text-align:center;">Loading history...</td></tr>
+                    </tbody>
+                </table>
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                    <div id="txCount" style="font-size:12px; color:#82A5D2;">0 transaction(s)</div>
+                    <button class="btn-secondary" style="width:auto; height:34px; padding:0 20px; margin-top:0;" onclick="navTo('pnlHome', getNavBtn(0))">← BACK</button>
+                </div>
+            </div>
+            
+            <!-- PANEL: MINI STATEMENT -->
+            <div id="pnlReceipt" class="panel">
+                <div class="form-card">
+                    <div class="form-title">🧾 Mini Statement</div>
+                    <div class="form-sub">Recent transaction receipt</div>
+                    
+                    <div id="receiptBox" style="background:#0A142A; border:1px dashed #00C6FF; padding:20px; border-radius:8px; font-family:'Consolas', monospace; font-size:13px; color:#E6F2FF; white-space:pre-wrap; margin-bottom:20px;">Loading receipt...</div>
+                    
+                    <div class="btn-row">
+                        <button class="btn-primary" onclick="downloadReceipt()">💾 SAVE RECEIPT</button>
+                        <button class="btn-secondary" onclick="navTo('pnlHome', getNavBtn(0))">← BACK</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PANEL: CHANGE PIN -->
+            <div id="pnlPin" class="panel">
+                <div class="form-card">
+                    <div class="form-title">🔑 Change PIN</div>
+                    <div class="form-sub">Update your 4-digit security PIN</div>
+                    <div class="banner-warn">⚠ Your PIN must be 4 digits. Never share it with anyone.</div>
+                    
+                    <div class="field-label">CURRENT PIN</div>
                     <div class="input-group">
-                        <input type="password" id="pinConf" maxlength="4">
-                        <button class="toggle-btn" onclick="togglePin('pinConf', this)">👁</button>
+                        <input type="password" id="pinOld" maxlength="4" placeholder="••••">
+                        <button class="eye-btn" onclick="toggleEye('pinOld', this)">👁</button>
+                    </div>
+                    
+                    <div class="field-label">NEW PIN (4 DIGITS)</div>
+                    <div class="input-group">
+                        <input type="password" id="pinNew" maxlength="4" placeholder="••••">
+                        <button class="eye-btn" onclick="toggleEye('pinNew', this)">👁</button>
+                    </div>
+                    
+                    <div class="field-label">CONFIRM NEW PIN</div>
+                    <div class="input-group">
+                        <input type="password" id="pinConf" maxlength="4" placeholder="••••">
+                        <button class="eye-btn" onclick="toggleEye('pinConf', this)">👁</button>
                     </div>
                     
                     <div id="pinMsg"></div>
-                    <button class="btn" onclick="doChangePin()">UPDATE PIN</button>
+                    <div class="btn-row">
+                        <button class="btn-primary" onclick="doChangePin()">CHANGE PIN</button>
+                        <button class="btn-secondary" onclick="clearInput('pinOld', 'pinMsg'); clearInput('pinNew', null); clearInput('pinConf', null);">CLEAR</button>
+                        <button class="btn-secondary" onclick="navTo('pnlHome', getNavBtn(0))">← BACK</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- REGISTRATION MODAL -->
-    <div id="regModal" class="modal">
-        <div class="card">
-            <div class="title">🏦 Open New Account</div>
-            <div class="label">Full Name</div>
-            <input type="text" id="regName">
-            <div class="label">Email Address</div>
-            <input type="email" id="regEmail">
-            <div class="label">Mobile Phone (10 Digits)</div>
-            <input type="text" id="regPhone" maxlength="10">
-            <div class="label">Account Type</div>
+    <div id="regModal" class="modal-overlay">
+        <div class="login-frame">
+            <div class="login-header">🏦 Open New Account</div>
+            
+            <div class="field-label">Full Name</div>
+            <input type="text" id="regName" placeholder="Enter full name">
+            
+            <div class="field-label">Email Address</div>
+            <input type="email" id="regEmail" placeholder="e.g. user@example.com">
+            
+            <div class="field-label">Mobile Phone (10 Digits)</div>
+            <input type="text" id="regPhone" placeholder="10-digit mobile number" maxlength="10">
+            
+            <div class="field-label">Account Type</div>
             <select id="regType">
                 <option value="SAVINGS">SAVINGS</option>
                 <option value="CURRENT">CURRENT</option>
             </select>
-            <div class="label">4-Digit PIN</div>
+            
+            <div class="field-label">4-Digit PIN</div>
             <div class="input-group">
-                <input type="password" id="regPin" maxlength="4">
-                <button class="toggle-btn" onclick="togglePin('regPin', this)">👁</button>
+                <input type="password" id="regPin" placeholder="••••" maxlength="4">
+                <button class="eye-btn" onclick="toggleEye('regPin', this)">👁</button>
             </div>
             
-            <div class="label">Initial Deposit (Min ₹500)</div>
+            <div class="field-label">Initial Deposit (Min ₹500)</div>
             <input type="number" id="regDep" value="1000">
-            <div id="regErr" class="error"></div>
-            <button class="btn" onclick="doRegister()">CREATE ACCOUNT</button>
-            <button class="btn btn-sec" onclick="closeModal('regModal')">CANCEL</button>
+            
+            <div id="regErr" class="error-lbl"></div>
+            <button class="btn-primary" onclick="doRegister()">CREATE ACCOUNT</button>
+            <button class="btn-secondary" onclick="closeModal('regModal')">CANCEL</button>
         </div>
     </div>
 
     <script>
         let authToken = '';
         let txData = [];
+
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0];
+            const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            if (document.getElementById('liveClock')) document.getElementById('liveClock').innerText = dateStr + ' ' + timeStr;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
 
         async function apiCall(endpoint, method = 'GET', data = null) {
             const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -570,7 +791,7 @@ public class WebAtmServer {
             return res.json();
         }
 
-        function togglePin(id, btn) {
+        function toggleEye(id, btn) {
             const input = document.getElementById(id);
             if (input.type === 'password') {
                 input.type = 'text';
@@ -582,6 +803,21 @@ public class WebAtmServer {
         }
 
         function setAmt(id, val) { document.getElementById(id).value = val; }
+        function clearInput(id, msgId) {
+            if (id) document.getElementById(id).value = '';
+            if (msgId) document.getElementById(msgId).innerHTML = '';
+        }
+
+        function getNavBtn(index) {
+            return document.querySelectorAll('.nav-btn')[index];
+        }
+
+        function navTo(panelId, btn) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(panelId).classList.add('active');
+            if (btn) btn.classList.add('active');
+        }
 
         async function doLogin() {
             const acc = document.getElementById('loginAcc').value;
@@ -590,19 +826,32 @@ public class WebAtmServer {
             const res = await apiCall('/api/login', 'POST', { accountNumber: acc, pin: pin });
             if (res.success) {
                 authToken = res.token;
-                document.getElementById('userName').innerText = res.fullName;
-                document.getElementById('userAcc').innerText = 'Acc: ' + res.accountNumber;
-                document.getElementById('userBal').innerText = '₹' + res.balance.toFixed(2);
+                document.getElementById('sideName').innerText = res.fullName;
+                document.getElementById('sideAcc').innerText = res.maskedAccount;
+                document.getElementById('sideBal').innerText = '₹' + res.balance.toLocaleString('en-IN', {minimumFractionDigits:2});
                 
-                document.getElementById('sumName').innerText = res.fullName;
-                document.getElementById('sumAcc').innerText = res.accountNumber;
-                document.getElementById('sumType').innerText = res.accountType;
-                document.getElementById('sumBal').innerText = '₹' + res.balance.toFixed(2);
-
-                document.getElementById('loginCard').style.display = 'none';
-                document.getElementById('dashContainer').style.display = 'block';
+                document.getElementById('heroName').innerText = res.fullName + ' 👤';
+                document.getElementById('heroBal').innerText = '₹' + res.balance.toLocaleString('en-IN', {minimumFractionDigits:2});
+                document.getElementById('heroAcc').innerText = res.maskedAccount;
+                document.getElementById('heroType').innerText = res.accountType;
+                
+                document.getElementById('loginFrame').style.display = 'none';
+                document.getElementById('dashFrame').style.display = 'flex';
             } else {
                 document.getElementById('loginErr').innerText = res.error || 'Login failed';
+            }
+        }
+
+        async function loadBalance() {
+            const res = await apiCall('/api/account');
+            if (res.success) {
+                const balStr = '₹' + res.balance.toLocaleString('en-IN', {minimumFractionDigits:2});
+                document.getElementById('sideBal').innerText = balStr;
+                document.getElementById('heroBal').innerText = balStr;
+                document.getElementById('balVal').innerText = balStr;
+                document.getElementById('balHolder').innerText = res.fullName;
+                document.getElementById('balAcc').innerText = res.maskedAccount;
+                document.getElementById('balType').innerText = res.accountType + ' Account';
             }
         }
 
@@ -610,12 +859,11 @@ public class WebAtmServer {
             const amt = document.getElementById('depAmt').value;
             const res = await apiCall('/api/deposit', 'POST', { amount: amt });
             if (res.success) {
-                document.getElementById('userBal').innerText = '₹' + res.newBalance.toFixed(2);
-                document.getElementById('sumBal').innerText = '₹' + res.newBalance.toFixed(2);
-                document.getElementById('depMsg').innerHTML = `<div class="success">✓ Deposit Successful! Ref: ${res.txRef}</div>`;
+                loadBalance();
+                document.getElementById('depMsg').innerHTML = `<div class="success-lbl">✓ Deposit Successful! Ref: ${res.txRef}</div>`;
                 document.getElementById('depAmt').value = '';
             } else {
-                document.getElementById('depMsg').innerHTML = `<div class="error">${res.error}</div>`;
+                document.getElementById('depMsg').innerHTML = `<div class="error-lbl">${res.error}</div>`;
             }
         }
 
@@ -623,12 +871,11 @@ public class WebAtmServer {
             const amt = document.getElementById('wdAmt').value;
             const res = await apiCall('/api/withdraw', 'POST', { amount: amt });
             if (res.success) {
-                document.getElementById('userBal').innerText = '₹' + res.newBalance.toFixed(2);
-                document.getElementById('sumBal').innerText = '₹' + res.newBalance.toFixed(2);
-                document.getElementById('wdMsg').innerHTML = `<div class="success">✓ Withdrawal Successful! Ref: ${res.txRef}</div>`;
+                loadBalance();
+                document.getElementById('wdMsg').innerHTML = `<div class="success-lbl">✓ Withdrawal Successful! Ref: ${res.txRef}</div>`;
                 document.getElementById('wdAmt').value = '';
             } else {
-                document.getElementById('wdMsg').innerHTML = `<div class="error">${res.error}</div>`;
+                document.getElementById('wdMsg').innerHTML = `<div class="error-lbl">${res.error}</div>`;
             }
         }
 
@@ -637,12 +884,11 @@ public class WebAtmServer {
             const amt = document.getElementById('trAmt').value;
             const res = await apiCall('/api/transfer', 'POST', { targetAccount: target, amount: amt });
             if (res.success) {
-                document.getElementById('userBal').innerText = '₹' + res.newBalance.toFixed(2);
-                document.getElementById('sumBal').innerText = '₹' + res.newBalance.toFixed(2);
-                document.getElementById('trMsg').innerHTML = `<div class="success">✓ Transfer Successful! Ref: ${res.txRef}</div>`;
+                loadBalance();
+                document.getElementById('trMsg').innerHTML = `<div class="success-lbl">✓ Transfer Successful! Ref: ${res.txRef}</div>`;
                 document.getElementById('trAmt').value = '';
             } else {
-                document.getElementById('trMsg').innerHTML = `<div class="error">${res.error}</div>`;
+                document.getElementById('trMsg').innerHTML = `<div class="error-lbl">${res.error}</div>`;
             }
         }
 
@@ -650,18 +896,20 @@ public class WebAtmServer {
             const res = await apiCall('/api/history');
             if (res.success) {
                 txData = res.transactions;
+                document.getElementById('txCount').innerText = txData.length + ' transaction(s)';
                 const tbody = document.getElementById('txTable');
                 if (txData.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5">No transactions found.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No transactions found.</td></tr>';
                     return;
                 }
-                tbody.innerHTML = txData.map(t => `
+                tbody.innerHTML = txData.map((t, idx) => `
                     <tr>
+                        <td>${idx + 1}</td>
                         <td>${t.date}</td>
-                        <td>${t.ref}</td>
-                        <td style="color:${t.type.includes('Deposit') || t.type.includes('In') ? '#00DC6E' : '#FF4646'};">${t.type}</td>
-                        <td>₹${t.amount.toFixed(2)}</td>
-                        <td>₹${t.balanceAfter.toFixed(2)}</td>
+                        <td>${t.type}</td>
+                        <td style="color:${t.signedAmount.startsWith('+') ? '#00DC6E' : '#FF4646'}; font-weight:700;">${t.signedAmount}</td>
+                        <td>₹${t.balanceAfter.toLocaleString('en-IN', {minimumFractionDigits:2})}</td>
+                        <td style="font-family:monospace; color:#82A5D2;">${t.ref}</td>
                     </tr>
                 `).join('');
             }
@@ -671,29 +919,39 @@ public class WebAtmServer {
             const res = await apiCall('/api/history');
             if (res.success) {
                 const list = res.transactions.slice(0, 5);
-                let txt = `========================================\n`;
-                txt += `           SECURE ATM RECEIPT           \n`;
-                txt += `========================================\n`;
-                txt += `Account: ${document.getElementById('sumAcc').innerText}\n`;
-                txt += `Holder:  ${document.getElementById('sumName').innerText}\n`;
-                txt += `Balance: ${document.getElementById('sumBal').innerText}\n`;
-                txt += `----------------------------------------\n`;
+                let txt = `=================================================\n`;
+                txt += `               SECURE ATM RECEIPT                \n`;
+                txt += `=================================================\n`;
+                txt += `Holder:  ${document.getElementById('sideName').innerText}\n`;
+                txt += `Account: ${document.getElementById('sideAcc').innerText}\n`;
+                txt += `Balance: ${document.getElementById('sideBal').innerText}\n`;
+                txt += `-------------------------------------------------\n`;
                 txt += `RECENT TRANSACTIONS:\n`;
                 list.forEach(t => {
-                    txt += `${t.date} | ${t.type.padEnd(12)} | ₹${t.amount.toFixed(2)}\n`;
+                    txt += `${t.date} | ${t.type.padEnd(14)} | ${t.signedAmount}\n`;
                 });
-                txt += `========================================\n`;
-                txt += `     THANK YOU FOR BANKING WITH US      \n`;
-                txt += `========================================\n`;
+                txt += `=================================================\n`;
+                txt += `        THANK YOU FOR BANKING WITH SECUREATM     \n`;
+                txt += `=================================================\n`;
                 document.getElementById('receiptBox').innerText = txt;
             }
         }
 
+        function downloadReceipt() {
+            const txt = document.getElementById('receiptBox').innerText;
+            const blob = new Blob([txt], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ATM_Receipt.txt';
+            a.click();
+        }
+
         function exportCSV() {
             if (txData.length === 0) return alert('No transaction data to export!');
-            let csv = 'Date,Reference,Type,Amount,BalanceAfter\\n';
-            txData.forEach(t => {
-                csv += `"${t.date}","${t.ref}","${t.type}",${t.amount},${t.balanceAfter}\\n`;
+            let csv = 'Index,Date,Type,Amount,BalanceAfter,Reference\\n';
+            txData.forEach((t, i) => {
+                csv += `${i+1},"${t.date}","${t.type}",${t.amount},${t.balanceAfter},"${t.ref}"\\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
@@ -709,10 +967,10 @@ public class WebAtmServer {
             const confP = document.getElementById('pinConf').value;
             const res = await apiCall('/api/change-pin', 'POST', { currentPin: oldP, newPin: newP, confirmPin: confP });
             if (res.success) {
-                document.getElementById('pinMsg').innerHTML = '<div class="success">✓ PIN changed successfully! Please log in again.</div>';
+                document.getElementById('pinMsg').innerHTML = '<div class="success-lbl">✓ PIN changed successfully! Please log in again.</div>';
                 setTimeout(doLogout, 2000);
             } else {
-                document.getElementById('pinMsg').innerHTML = `<div class="error">${res.error}</div>`;
+                document.getElementById('pinMsg').innerHTML = `<div class="error-lbl">${res.error}</div>`;
             }
         }
 
@@ -738,15 +996,8 @@ public class WebAtmServer {
         function doLogout() {
             apiCall('/api/logout', 'POST');
             authToken = '';
-            document.getElementById('dashContainer').style.display = 'none';
-            document.getElementById('loginCard').style.display = 'block';
-        }
-
-        function showTab(tabId, btn) {
-            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            btn.classList.add('active');
+            document.getElementById('dashFrame').style.display = 'none';
+            document.getElementById('loginFrame').style.display = 'block';
         }
 
         function openModal(id) { document.getElementById(id).classList.add('active'); }
