@@ -110,13 +110,17 @@ public final class DatabaseConnection {
             String envUrl  = System.getenv("DB_URL");
 
             if (envHost != null && !envHost.isBlank()) {
-                url = "jdbc:mysql://" + envHost + ":" + (envPort != null ? envPort : "3306") + "/" + envDb + "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
-                username = envUser;
-                password = envPass;
+                url = "jdbc:mysql://" + envHost + ":" + (envPort != null ? envPort : "3306") + "/" + (envDb != null ? envDb : "railway") + "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+                username = envUser != null ? envUser : "root";
+                password = envPass != null ? envPass : "tbYrETJfetbesRhyaaQfgJjgCMMFsVhV";
             } else if (envUrl != null && !envUrl.isBlank()) {
-                url = envUrl;
+                url = envUrl.replace("mysql-production-2b57.up.railway.app", "mysql.railway.internal");
                 username = System.getenv("DB_USERNAME");
                 password = System.getenv("DB_PASSWORD");
+            } else if (java.awt.GraphicsEnvironment.isHeadless()) {
+                url = "jdbc:mysql://mysql.railway.internal:3306/railway?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true";
+                username = "root";
+                password = "tbYrETJfetbesRhyaaQfgJjgCMMFsVhV";
             } else {
                 url      = props.getProperty("db.url");
                 username = props.getProperty("db.username");
