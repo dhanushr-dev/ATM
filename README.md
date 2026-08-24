@@ -292,7 +292,8 @@ mvn test
 Oasis Infobyte Java Development Intern  
 Project: ATM Interface | Task 3  
 
-- 🔗 **LinkedIn:** [Dhanush R](https://www.linkedin.com/in/dhanushr-dev)  
+- 📧 **Email:** [dhanushrmdy@gmail.com](mailto:dhanushrmdy@gmail.com)  
+- 🔗 **LinkedIn:** [Dhanush R](https://www.linkedin.com/in/dhanushr)  
 - 🐙 **GitHub:** [dhanushr-dev](https://github.com/dhanushr-dev)
 
 ---
