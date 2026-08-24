@@ -27,6 +27,13 @@
             <version>8.3.0</version>
         </dependency>
 
+        <!-- H2 Database for Embedded / Cloud Fallback -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>2.2.224</version>
+        </dependency>
+
         <!-- BCrypt for PIN hashing -->
         <dependency>
             <groupId>org.mindrot</groupId>
